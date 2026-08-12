@@ -1,13 +1,6 @@
 /* =========================================================
    LITTLE BLOSSOMS — script.js
-   Fixed Version
-   - Gallery photos/videos
-   - GitHub Pages compatible paths
-   - Supports 1.mp4, 2.mp4 AND lit1.mp4, lit2.mp4
-   - Three.js CDN import
-   - Mobile safe
-   - Scroll reveal
-   - Mobile navigation
+   FINAL FIXED VERSION
    ========================================================= */
 
 
@@ -40,7 +33,6 @@ const navLinks = document.querySelectorAll(".nav-link");
 const sections = document.querySelectorAll(
   "main > section, .hero, .admission"
 );
-
 
 function onScroll() {
 
@@ -92,8 +84,11 @@ onScroll();
    MOBILE MENU
    ========================================================= */
 
-const navToggle = document.getElementById("navToggle");
-const navLinksList = document.getElementById("navLinks");
+const navToggle =
+  document.getElementById("navToggle");
+
+const navLinksList =
+  document.getElementById("navLinks");
 
 if (navToggle && navLinksList) {
 
@@ -113,7 +108,6 @@ if (navToggle && navLinksList) {
     );
 
   });
-
 
   navLinksList
     .querySelectorAll("a")
@@ -175,7 +169,9 @@ if ("IntersectionObserver" in window) {
           entry.target.style.transitionDelay =
             `${Math.min(index * 90, 360)}ms`;
 
-          entry.target.classList.add("in-view");
+          entry.target.classList.add(
+            "in-view"
+          );
 
           revealObserver.unobserve(
             entry.target
@@ -189,7 +185,6 @@ if ("IntersectionObserver" in window) {
         rootMargin: "0px 0px -60px 0px"
       }
     );
-
 
   revealEls.forEach((el) => {
     revealObserver.observe(el);
@@ -225,75 +220,102 @@ const lightboxMedia =
 
 
 let lastFocusedEl = null;
-let mediaLoadToken = 0;
-
-
-/*
-   Number of files to check.
-   Example:
-
-   classroom/
-   1.mp4
-   2.mp4
-   3.jpg
-   lit1.mp4
-   lit2.mp4
-*/
-
-const MEDIA_SLOTS = 12;
-
-const IMAGE_EXTS = [
-  "jpg",
-  "jpeg",
-  "png",
-  "webp"
-];
-
-const VIDEO_EXTS = [
-  "mp4",
-  "webm",
-  "mov"
-];
 
 
 /* =========================================================
-   GITHUB PAGES BASE PATH
+   MEDIA SETTINGS
    ========================================================= */
 
-function mediaPath(folder, filename) {
+const MEDIA_SLOTS = 12;
+
+
+/*
+   IMPORTANT
+
+   GitHub Pages project:
+
+   https://littleblossom0111-droid.github.io/Test/
+
+   Media:
+
+   /Test/media/classroom/1.mp4
+   /Test/media/classroom/lit1.mp4
+*/
+
+
+function getSiteBase() {
+
+  const path =
+    window.location.pathname;
 
   /*
-     Relative path is safest for GitHub Pages project sites.
+     Find GitHub Pages repository path.
+
      Example:
 
-     /Test/media/classroom/1.mp4
-
-     when page is:
-
      /Test/
+     /Test/index.html
+     /Test/about.html
   */
 
-  return `media/${folder}/${filename}`;
+  const parts =
+    path.split("/").filter(Boolean);
+
+  if (
+    parts.length > 0 &&
+    !parts[0].includes(".")
+  ) {
+
+    return "/" + parts[0] + "/";
+
+  }
+
+  return "/";
+
 }
 
 
 /* =========================================================
-   IMAGE CHECK
+   MEDIA PATH
+   ========================================================= */
+
+function mediaPath(
+  folder,
+  filename
+) {
+
+  const base =
+    getSiteBase();
+
+  return (
+    base +
+    "media/" +
+    folder +
+    "/" +
+    filename
+  );
+
+}
+
+
+/* =========================================================
+   PROBE IMAGE
    ========================================================= */
 
 function probeImage(src) {
 
   return new Promise((resolve) => {
 
-    const img = new Image();
+    const img =
+      new Image();
 
-    let finished = false;
+    let done = false;
 
     const finish = (ok) => {
 
-      if (finished) return;
+      if (done) return;
 
-      finished = true;
+      done = true;
 
       resolve({
         ok,
@@ -302,9 +324,13 @@ function probeImage(src) {
 
     };
 
-    img.onload = () => finish(true);
+    img.onload = () => {
+      finish(true);
+    };
 
-    img.onerror = () => finish(false);
+    img.onerror = () => {
+      finish(false);
+    };
 
     img.src = src;
 
@@ -314,7 +340,7 @@ function probeImage(src) {
 
 
 /* =========================================================
-   VIDEO CHECK
+   PROBE VIDEO
    ========================================================= */
 
 function probeVideo(src) {
@@ -324,13 +350,17 @@ function probeVideo(src) {
     const video =
       document.createElement("video");
 
-    let finished = false;
+    let done = false;
 
     const finish = (ok) => {
 
-      if (finished) return;
+      if (done) return;
 
-      finished = true;
+      done = true;
+
+      video.removeAttribute("src");
+
+      video.load();
 
       resolve({
         ok,
@@ -346,33 +376,42 @@ function probeVideo(src) {
     video.playsInline = true;
 
     video.onloadedmetadata = () => {
+
       finish(true);
+
     };
 
     video.onerror = () => {
+
       finish(false);
+
     };
 
     video.src = src;
 
     video.load();
 
-
     /*
-       Some mobile browsers don't immediately
-       fire loadedmetadata.
+       Safety timeout
     */
 
     setTimeout(() => {
 
-      if (
-        !finished &&
-        video.readyState >= 1
-      ) {
-        finish(true);
+      if (!done) {
+
+        if (video.readyState >= 1) {
+
+          finish(true);
+
+        } else {
+
+          finish(false);
+
+        }
+
       }
 
-    }, 3000);
+    }, 4000);
 
   });
 
@@ -389,16 +428,18 @@ async function findSlotMedia(
 ) {
 
   /*
-     First check normal files:
+     Check:
 
      1.jpg
      1.png
+     1.webp
      1.mp4
 
-     Then check:
+     Then:
 
      lit1.jpg
      lit1.png
+     lit1.webp
      lit1.mp4
   */
 
@@ -408,11 +449,22 @@ async function findSlotMedia(
   ];
 
 
-  /* ---------- IMAGES ---------- */
+  /* =======================================================
+     IMAGES
+     ======================================================= */
+
+  const imageExtensions = [
+    "jpg",
+    "jpeg",
+    "png",
+    "webp"
+  ];
 
   for (const name of names) {
 
-    for (const ext of IMAGE_EXTS) {
+    for (
+      const ext of imageExtensions
+    ) {
 
       const src =
         mediaPath(
@@ -437,11 +489,20 @@ async function findSlotMedia(
   }
 
 
-  /* ---------- VIDEOS ---------- */
+  /* =======================================================
+     VIDEOS
+     ======================================================= */
+
+  const videoExtensions = [
+    "mp4",
+    "webm"
+  ];
 
   for (const name of names) {
 
-    for (const ext of VIDEO_EXTS) {
+    for (
+      const ext of videoExtensions
+    ) {
 
       const src =
         mediaPath(
@@ -467,12 +528,15 @@ async function findSlotMedia(
 
 
   return null;
+
 }
 
 
 /* =========================================================
-   LOAD GALLERY MEDIA
+   LOAD GALLERY
    ========================================================= */
+
+let mediaLoadToken = 0;
 
 async function loadGalleryMedia(
   folder,
@@ -489,7 +553,16 @@ async function loadGalleryMedia(
   `;
 
 
-  const checks = [];
+  const results = [];
+
+
+  /*
+     Sequential loading.
+
+     This is intentionally NOT Promise.all()
+     because mobile GitHub Pages browsers can
+     struggle with many simultaneous video requests.
+  */
 
   for (
     let i = 1;
@@ -497,56 +570,56 @@ async function loadGalleryMedia(
     i++
   ) {
 
-    checks.push(
-      findSlotMedia(folder, i)
-    );
+    if (token !== mediaLoadToken) {
+      return;
+    }
+
+    const media =
+      await findSlotMedia(
+        folder,
+        i
+      );
+
+    if (media) {
+      results.push(media);
+    }
 
   }
 
-
-  const results =
-    await Promise.all(checks);
-
-
-  /*
-     If user clicked another gallery item
-     while loading old item, stop.
-  */
 
   if (token !== mediaLoadToken) {
     return;
   }
 
 
-  const found =
-    results.filter(Boolean);
+  /* =======================================================
+     NOTHING FOUND
+     ======================================================= */
 
-
-  /* ---------- NOTHING FOUND ---------- */
-
-  if (!found.length) {
+  if (!results.length) {
 
     lightboxMedia.innerHTML = `
       <div class="lightbox-empty">
 
-        <strong>No photos or videos found.</strong>
+        <strong>
+          No photos or videos found.
+        </strong>
 
         <br><br>
 
         Folder:
-        <code>media/${folder}/</code>
+
+        <code>
+          media/${folder}/
+        </code>
 
         <br><br>
 
-        Use names like:
+        Example:
 
         <br>
 
         <code>1.jpg</code>
-
-        <br>
-
-        <code>2.jpg</code>
 
         <br>
 
@@ -560,58 +633,133 @@ async function loadGalleryMedia(
     `;
 
     return;
+
   }
 
 
-  /* ---------- DISPLAY MEDIA ---------- */
+  /* =======================================================
+     DISPLAY MEDIA
+     ======================================================= */
 
   lightboxMedia.innerHTML = "";
 
 
-  found.forEach((item) => {
+  results.forEach((item) => {
+
+    /* -----------------------------------------------------
+       IMAGE
+       ----------------------------------------------------- */
 
     if (item.type === "image") {
 
       const img =
         document.createElement("img");
 
-      img.src = item.src;
+      img.src =
+        item.src;
 
-      img.alt = "Little Blossoms";
+      img.alt =
+        "Little Blossoms";
 
-      img.loading = "lazy";
+      img.loading =
+        "lazy";
 
-      img.decoding = "async";
+      img.decoding =
+        "async";
 
-      lightboxMedia.appendChild(img);
+      lightboxMedia.appendChild(
+        img
+      );
 
     }
 
 
-    else if (item.type === "video") {
+    /* -----------------------------------------------------
+       VIDEO
+       ----------------------------------------------------- */
+
+    if (item.type === "video") {
+
+      const wrapper =
+        document.createElement("div");
+
+      wrapper.className =
+        "lightbox-video";
+
 
       const video =
         document.createElement("video");
 
-      video.src = item.src;
 
-      video.controls = true;
+      video.src =
+        item.src;
 
-      video.preload = "metadata";
 
-      video.playsInline = true;
+      video.controls =
+        true;
+
+
+      video.preload =
+        "metadata";
+
+
+      video.playsInline =
+        true;
+
+
+      video.muted =
+        false;
+
 
       video.setAttribute(
         "playsinline",
         ""
       );
 
+
       video.setAttribute(
         "webkit-playsinline",
         ""
       );
 
-      lightboxMedia.appendChild(video);
+
+      video.setAttribute(
+        "controlslist",
+        "nodownload"
+      );
+
+
+      /*
+         Important:
+         Don't autoplay.
+         User taps play.
+      */
+
+      video.autoplay =
+        false;
+
+
+      video.addEventListener(
+        "error",
+        () => {
+
+          console.error(
+            "Video failed:",
+            item.src
+          );
+
+        }
+      );
+
+
+      wrapper.appendChild(
+        video
+      );
+
+
+      lightboxMedia.appendChild(
+        wrapper
+      );
 
     }
 
@@ -633,6 +781,10 @@ function openLightbox(card) {
     document.activeElement;
 
 
+  /* -------------------------------------------------------
+     EMOJI
+     ------------------------------------------------------- */
+
   if (lightboxEmoji) {
 
     lightboxEmoji.textContent =
@@ -640,6 +792,10 @@ function openLightbox(card) {
 
   }
 
+
+  /* -------------------------------------------------------
+     TITLE
+     ------------------------------------------------------- */
 
   if (lightboxTitle) {
 
@@ -649,6 +805,10 @@ function openLightbox(card) {
   }
 
 
+  /* -------------------------------------------------------
+     DESCRIPTION
+     ------------------------------------------------------- */
+
   if (lightboxDesc) {
 
     lightboxDesc.textContent =
@@ -657,7 +817,13 @@ function openLightbox(card) {
   }
 
 
-  lightbox.classList.add("open");
+  /* -------------------------------------------------------
+     OPEN
+     ------------------------------------------------------- */
+
+  lightbox.classList.add(
+    "open"
+  );
 
   lightbox.setAttribute(
     "aria-hidden",
@@ -669,15 +835,29 @@ function openLightbox(card) {
     "hidden";
 
 
+  /* -------------------------------------------------------
+     FOCUS CLOSE BUTTON
+     ------------------------------------------------------- */
+
   const closeButton =
     lightbox.querySelector(
       ".lightbox-close"
     );
 
   if (closeButton) {
-    closeButton.focus();
+
+    setTimeout(() => {
+
+      closeButton.focus();
+
+    }, 50);
+
   }
 
+
+  /* -------------------------------------------------------
+     FOLDER
+     ------------------------------------------------------- */
 
   const folder =
     card.dataset.folder;
@@ -687,9 +867,12 @@ function openLightbox(card) {
 
     mediaLoadToken++;
 
+    const token =
+      mediaLoadToken;
+
     loadGalleryMedia(
       folder,
-      mediaLoadToken
+      token
     );
 
   }
@@ -706,7 +889,10 @@ function closeLightbox() {
   if (!lightbox) return;
 
 
-  lightbox.classList.remove("open");
+  lightbox.classList.remove(
+    "open"
+  );
+
 
   lightbox.setAttribute(
     "aria-hidden",
@@ -714,16 +900,8 @@ function closeLightbox() {
   );
 
 
-  document.body.style.overflow = "";
-
-
-  if (lastFocusedEl) {
-
-    try {
-      lastFocusedEl.focus();
-    } catch (e) {}
-
-  }
+  document.body.style.overflow =
+    "";
 
 
   if (lightboxMedia) {
@@ -736,7 +914,24 @@ function closeLightbox() {
 
         video.currentTime = 0;
 
+        video.removeAttribute(
+          "src"
+        );
+
+        video.load();
+
       });
+
+  }
+
+
+  if (lastFocusedEl) {
+
+    try {
+
+      lastFocusedEl.focus();
+
+    } catch (error) {}
 
   }
 
@@ -744,23 +939,35 @@ function closeLightbox() {
 
 
 /* =========================================================
-   GALLERY CLICK EVENTS
+   GALLERY CLICK
    ========================================================= */
 
 document
-  .querySelectorAll("[data-gallery-item]")
+  .querySelectorAll(
+    "[data-gallery-item]"
+  )
   .forEach((card) => {
 
     card.addEventListener(
       "click",
-      () => openLightbox(card)
+      () => {
+
+        openLightbox(card);
+
+      }
     );
 
   });
 
 
+/* =========================================================
+   LIGHTBOX CLOSE BUTTON
+   ========================================================= */
+
 document
-  .querySelectorAll("[data-lightbox-close]")
+  .querySelectorAll(
+    "[data-lightbox-close]"
+  )
   .forEach((element) => {
 
     element.addEventListener(
@@ -770,6 +977,10 @@ document
 
   });
 
+
+/* =========================================================
+   ESCAPE KEY
+   ========================================================= */
 
 document.addEventListener(
   "keydown",
@@ -798,12 +1009,16 @@ function supportsWebGL() {
   try {
 
     const canvas =
-      document.createElement("canvas");
+      document.createElement(
+        "canvas"
+      );
 
     return !!(
       window.WebGLRenderingContext &&
       (
-        canvas.getContext("webgl") ||
+        canvas.getContext(
+          "webgl"
+        ) ||
         canvas.getContext(
           "experimental-webgl"
         )
@@ -829,7 +1044,9 @@ const heroCanvas =
   );
 
 const hero =
-  document.querySelector(".hero");
+  document.querySelector(
+    ".hero"
+  );
 
 
 if (
@@ -842,7 +1059,10 @@ if (
 
 }
 
-else if (heroCanvas && hero) {
+else if (
+  heroCanvas &&
+  hero
+) {
 
   heroCanvas.style.display =
     "none";
@@ -863,19 +1083,6 @@ async function initHeroScene() {
   let THREE;
 
 
-  /*
-     IMPORTANT FIX:
-
-     Old:
-     import("three")
-
-     This does NOT work directly on
-     GitHub Pages.
-
-     New:
-     Import Three.js from CDN.
-  */
-
   try {
 
     THREE = await import(
@@ -890,27 +1097,36 @@ async function initHeroScene() {
     );
 
     if (heroCanvas) {
+
       heroCanvas.style.display =
         "none";
+
     }
 
     if (hero) {
+
       hero.classList.add(
         "no-webgl"
       );
+
     }
 
     return;
+
   }
 
 
-  /* ---------- SIZE ---------- */
+  /* =======================================================
+     SIZE
+     ======================================================= */
 
   let width =
-    hero.clientWidth || window.innerWidth;
+    hero.clientWidth ||
+    window.innerWidth;
 
   let height =
-    hero.clientHeight || 700;
+    hero.clientHeight ||
+    700;
 
 
   const pixelRatio =
@@ -920,7 +1136,9 @@ async function initHeroScene() {
     );
 
 
-  /* ---------- SCENE ---------- */
+  /* =======================================================
+     SCENE
+     ======================================================= */
 
   const scene =
     new THREE.Scene();
@@ -934,7 +1152,9 @@ async function initHeroScene() {
     );
 
 
-  /* ---------- CAMERA ---------- */
+  /* =======================================================
+     CAMERA
+     ======================================================= */
 
   const camera =
     new THREE.PerspectiveCamera(
@@ -959,7 +1179,9 @@ async function initHeroScene() {
   );
 
 
-  /* ---------- RENDERER ---------- */
+  /* =======================================================
+     RENDERER
+     ======================================================= */
 
   let renderer;
 
@@ -1003,6 +1225,7 @@ async function initHeroScene() {
     pixelRatio
   );
 
+
   renderer.setSize(
     width,
     height,
@@ -1012,6 +1235,7 @@ async function initHeroScene() {
 
   renderer.shadowMap.enabled =
     true;
+
 
   renderer.shadowMap.type =
     THREE.PCFSoftShadowMap;
@@ -1038,7 +1262,9 @@ async function initHeroScene() {
       1.05
     );
 
-  scene.add(hemi);
+  scene.add(
+    hemi
+  );
 
 
   const sun =
@@ -1047,13 +1273,16 @@ async function initHeroScene() {
       1.6
     );
 
+
   sun.position.set(
     6,
     10,
     6
   );
 
-  sun.castShadow = true;
+
+  sun.castShadow =
+    true;
 
 
   sun.shadow.mapSize.set(
@@ -1062,15 +1291,28 @@ async function initHeroScene() {
   );
 
 
-  sun.shadow.camera.left = -10;
-  sun.shadow.camera.right = 10;
-  sun.shadow.camera.top = 10;
-  sun.shadow.camera.bottom = -10;
-  sun.shadow.camera.far = 30;
+  sun.shadow.camera.left =
+    -10;
 
-  sun.shadow.bias = -0.0025;
+  sun.shadow.camera.right =
+    10;
 
-  scene.add(sun);
+  sun.shadow.camera.top =
+    10;
+
+  sun.shadow.camera.bottom =
+    -10;
+
+  sun.shadow.camera.far =
+    30;
+
+  sun.shadow.bias =
+    -0.0025;
+
+
+  scene.add(
+    sun
+  );
 
 
   const fill =
@@ -1080,17 +1322,21 @@ async function initHeroScene() {
       20
     );
 
+
   fill.position.set(
     -6,
     4,
     4
   );
 
-  scene.add(fill);
+
+  scene.add(
+    fill
+  );
 
 
   /* =======================================================
-     MATERIALS
+     MATERIAL HELPER
      ======================================================= */
 
   const mat = (
@@ -1100,25 +1346,45 @@ async function initHeroScene() {
   ) => {
 
     return new THREE.MeshStandardMaterial({
+
       color,
+
       roughness,
+
       metalness
+
     });
 
   };
 
 
   const matWall =
-    mat(0xfff3e2, 0.9);
+    mat(
+      0xfff3e2,
+      0.9
+    );
+
 
   const matRoof =
-    mat(0xff8fa3, 0.6);
+    mat(
+      0xff8fa3,
+      0.6
+    );
+
 
   const matRoofDeep =
-    mat(0xe8536b, 0.6);
+    mat(
+      0xe8536b,
+      0.6
+    );
+
 
   const matDoor =
-    mat(0x7fb685, 0.7);
+    mat(
+      0x7fb685,
+      0.7
+    );
+
 
   const matWindow =
     mat(
@@ -1127,11 +1393,13 @@ async function initHeroScene() {
       0.1
     );
 
+
   const matGrass =
     mat(
       0x9fd6a6,
       0.95
     );
+
 
   const matGrassDeep =
     mat(
@@ -1139,11 +1407,13 @@ async function initHeroScene() {
       0.95
     );
 
+
   const matTrunk =
     mat(
       0xb08463,
       0.9
     );
+
 
   const matLeaf =
     mat(
@@ -1151,11 +1421,13 @@ async function initHeroScene() {
       0.8
     );
 
+
   const matLeafDeep =
     mat(
       0x4f9d5c,
       0.8
     );
+
 
   const matPath =
     mat(
@@ -1167,23 +1439,33 @@ async function initHeroScene() {
   const matCloud =
     new THREE.MeshStandardMaterial({
 
-      color: 0xffffff,
+      color:
+        0xffffff,
 
-      roughness: 1,
+      roughness:
+        1,
 
-      transparent: true,
+      transparent:
+        true,
 
-      opacity: 0.92
+      opacity:
+        0.92
 
     });
 
 
   const balloonColors = [
+
     0xff6f81,
+
     0xffc259,
+
     0x8fcbe8,
+
     0x9fd6a6,
+
     0xd9bff5
+
   ];
 
 
@@ -1194,64 +1476,89 @@ async function initHeroScene() {
   const world =
     new THREE.Group();
 
-  scene.add(world);
+
+  scene.add(
+    world
+  );
 
 
-  /* ---------- GROUND ---------- */
+  /* =======================================================
+     GROUND
+     ======================================================= */
 
   const ground =
     new THREE.Mesh(
+
       new THREE.CircleGeometry(
         14,
         48
       ),
+
       matGrass
+
     );
 
 
   ground.rotation.x =
     -Math.PI / 2;
 
+
   ground.receiveShadow =
     true;
 
-  world.add(ground);
+
+  world.add(
+    ground
+  );
 
 
   const groundRing =
     new THREE.Mesh(
+
       new THREE.RingGeometry(
         6.6,
         14,
         48
       ),
+
       matGrassDeep
+
     );
 
 
   groundRing.rotation.x =
     -Math.PI / 2;
 
+
   groundRing.position.y =
     -0.02;
 
-  world.add(groundRing);
+
+  world.add(
+    groundRing
+  );
 
 
-  /* ---------- PATH ---------- */
+  /* =======================================================
+     PATH
+     ======================================================= */
 
   const path =
     new THREE.Mesh(
+
       new THREE.PlaneGeometry(
         1.6,
         4.2
       ),
+
       matPath
+
     );
 
 
   path.rotation.x =
     -Math.PI / 2;
+
 
   path.position.set(
     0,
@@ -1259,11 +1566,14 @@ async function initHeroScene() {
     4.6
   );
 
-  world.add(path);
+
+  world.add(
+    path
+  );
 
 
   /* =======================================================
-     PRESCHOOL BUILDING
+     BUILDING
      ======================================================= */
 
   const building =
@@ -1279,73 +1589,101 @@ async function initHeroScene() {
 
   const base =
     new THREE.Mesh(
+
       new THREE.BoxGeometry(
         5.2,
         2.6,
         3.6
       ),
+
       matWall
+
     );
 
 
   base.position.y =
     1.3;
 
-  base.castShadow = true;
 
-  base.receiveShadow = true;
+  base.castShadow =
+    true;
 
-  building.add(base);
+
+  base.receiveShadow =
+    true;
+
+
+  building.add(
+    base
+  );
 
 
   const roof =
     new THREE.Mesh(
+
       new THREE.ConeGeometry(
         3.9,
         1.8,
         4
       ),
+
       matRoof
+
     );
 
 
   roof.position.y =
     3.5;
 
+
   roof.rotation.y =
     Math.PI / 4;
+
 
   roof.castShadow =
     true;
 
-  building.add(roof);
+
+  building.add(
+    roof
+  );
 
 
   const roofTrim =
     new THREE.Mesh(
+
       new THREE.TorusGeometry(
         0.18,
         0.08,
         8,
         24
       ),
+
       matRoofDeep
+
     );
 
 
   roofTrim.position.y =
     2.62;
 
+
   roofTrim.rotation.x =
     Math.PI / 2;
 
-  building.add(roofTrim);
+
+  building.add(
+    roofTrim
+  );
 
 
-  /* ---------- DOOR ---------- */
+  /* =======================================================
+     DOOR
+     ======================================================= */
 
   const door =
     new THREE.Mesh(
+
       new THREE.CylinderGeometry(
         0.55,
         0.55,
@@ -1356,15 +1694,19 @@ async function initHeroScene() {
         0,
         Math.PI
       ),
+
       matDoor
+
     );
 
 
   door.rotation.z =
     Math.PI;
 
+
   door.rotation.y =
     Math.PI / 2;
+
 
   door.position.set(
     0,
@@ -1372,10 +1714,15 @@ async function initHeroScene() {
     1.81
   );
 
-  building.add(door);
+
+  building.add(
+    door
+  );
 
 
-  /* ---------- WINDOWS ---------- */
+  /* =======================================================
+     WINDOWS
+     ======================================================= */
 
   const windowGeo =
     new THREE.CircleGeometry(
@@ -1401,17 +1748,22 @@ async function initHeroScene() {
       );
 
 
-      building.add(win);
+      building.add(
+        win
+      );
 
 
       const frame =
         new THREE.Mesh(
+
           new THREE.RingGeometry(
             0.45,
             0.53,
             20
           ),
+
           matRoofDeep
+
         );
 
 
@@ -1422,22 +1774,29 @@ async function initHeroScene() {
       );
 
 
-      building.add(frame);
+      building.add(
+        frame
+      );
 
     }
   );
 
 
-  /* ---------- CHIMNEY ---------- */
+  /* =======================================================
+     CHIMNEY
+     ======================================================= */
 
   const chimney =
     new THREE.Mesh(
+
       new THREE.BoxGeometry(
         0.45,
         1.1,
         0.45
       ),
+
       matRoofDeep
+
     );
 
 
@@ -1447,22 +1806,31 @@ async function initHeroScene() {
     -0.6
   );
 
+
   chimney.castShadow =
     true;
 
-  building.add(chimney);
+
+  building.add(
+    chimney
+  );
 
 
-  /* ---------- SIGN ---------- */
+  /* =======================================================
+     SIGN
+     ======================================================= */
 
   const signPost =
     new THREE.Mesh(
+
       new THREE.CylinderGeometry(
         0.05,
         0.05,
         1
       ),
+
       matTrunk
+
     );
 
 
@@ -1473,16 +1841,21 @@ async function initHeroScene() {
   );
 
 
-  building.add(signPost);
+  building.add(
+    signPost
+  );
 
 
   const signBoard =
     new THREE.Mesh(
+
       new THREE.CircleGeometry(
         0.42,
         24
       ),
+
       matRoof
+
     );
 
 
@@ -1493,10 +1866,14 @@ async function initHeroScene() {
   );
 
 
-  building.add(signBoard);
+  building.add(
+    signBoard
+  );
 
 
-  world.add(building);
+  world.add(
+    building
+  );
 
 
   /* =======================================================
@@ -1530,12 +1907,15 @@ async function initHeroScene() {
 
   const slideLeg1 =
     new THREE.Mesh(
+
       new THREE.CylinderGeometry(
         0.06,
         0.06,
         1.6
       ),
+
       slideFrameMat
+
     );
 
 
@@ -1569,12 +1949,15 @@ async function initHeroScene() {
 
   const slideBoard =
     new THREE.Mesh(
+
       new THREE.BoxGeometry(
         1.3,
         0.08,
         2.1
       ),
+
       slideBoardMat
+
     );
 
 
@@ -1600,12 +1983,17 @@ async function initHeroScene() {
 
   playground.children.forEach(
     (child) => {
-      child.castShadow = true;
+
+      child.castShadow =
+        true;
+
     }
   );
 
 
-  world.add(playground);
+  world.add(
+    playground
+  );
 
 
   /* =======================================================
@@ -1652,7 +2040,9 @@ async function initHeroScene() {
   );
 
 
-  swing.add(barL);
+  swing.add(
+    barL
+  );
 
 
   const barR =
@@ -1669,17 +2059,22 @@ async function initHeroScene() {
   );
 
 
-  swing.add(barR);
+  swing.add(
+    barR
+  );
 
 
   const barTop =
     new THREE.Mesh(
+
       new THREE.CylinderGeometry(
         0.05,
         0.05,
         1.9
       ),
+
       swingMat
+
     );
 
 
@@ -1694,20 +2089,25 @@ async function initHeroScene() {
   );
 
 
-  swing.add(barTop);
+  swing.add(
+    barTop
+  );
 
 
   const seat =
     new THREE.Mesh(
+
       new THREE.BoxGeometry(
         0.5,
         0.06,
         0.25
       ),
+
       mat(
         0xff8fa3,
         0.6
       )
+
     );
 
 
@@ -1718,17 +2118,24 @@ async function initHeroScene() {
   );
 
 
-  swing.add(seat);
+  swing.add(
+    seat
+  );
 
 
   swing.children.forEach(
     (child) => {
-      child.castShadow = true;
+
+      child.castShadow =
+        true;
+
     }
   );
 
 
-  world.add(swing);
+  world.add(
+    swing
+  );
 
 
   /* =======================================================
@@ -1745,53 +2152,70 @@ async function initHeroScene() {
 
     const trunk =
       new THREE.Mesh(
+
         new THREE.CylinderGeometry(
           0.12,
           0.16,
           1.1,
           8
         ),
+
         matTrunk
+
       );
 
 
     trunk.position.y =
       0.55;
 
+
     trunk.castShadow =
       true;
 
-    group.add(trunk);
+
+    group.add(
+      trunk
+    );
 
 
     const leafA =
       new THREE.Mesh(
+
         new THREE.SphereGeometry(
           0.75,
           12,
           10
         ),
+
         matLeaf
+
       );
 
 
     leafA.position.y =
       1.35;
 
+
     leafA.castShadow =
       true;
 
-    group.add(leafA);
+
+    group.add(
+      leafA
+    );
 
 
     const leafB =
       new THREE.Mesh(
+
         new THREE.SphereGeometry(
           0.55,
           12,
           10
         ),
+
         matLeafDeep
+
       );
 
 
@@ -1805,17 +2229,23 @@ async function initHeroScene() {
     leafB.castShadow =
       true;
 
-    group.add(leafB);
+
+    group.add(
+      leafB
+    );
 
 
     const leafC =
       new THREE.Mesh(
+
         new THREE.SphereGeometry(
           0.5,
           12,
           10
         ),
+
         matLeafDeep
+
       );
 
 
@@ -1829,7 +2259,10 @@ async function initHeroScene() {
     leafC.castShadow =
       true;
 
-    group.add(leafC);
+
+    group.add(
+      leafC
+    );
 
 
     group.scale.setScalar(
@@ -1863,7 +2296,10 @@ async function initHeroScene() {
     ([x, y, z, scale]) => {
 
       const tree =
-        makeTree(scale);
+        makeTree(
+          scale
+        );
+
 
       tree.position.set(
         x,
@@ -1871,7 +2307,10 @@ async function initHeroScene() {
         z
       );
 
-      world.add(tree);
+
+      world.add(
+        tree
+      );
 
     }
   );
@@ -1889,13 +2328,16 @@ async function initHeroScene() {
 
     const stem =
       new THREE.Mesh(
+
         new THREE.CylinderGeometry(
           0.025,
           0.025,
           0.4,
           6
         ),
+
         matLeafDeep
+
       );
 
 
@@ -1903,7 +2345,9 @@ async function initHeroScene() {
       0.2;
 
 
-    group.add(stem);
+    group.add(
+      stem
+    );
 
 
     const petalMat =
@@ -1921,44 +2365,60 @@ async function initHeroScene() {
 
       const petal =
         new THREE.Mesh(
+
           new THREE.SphereGeometry(
             0.09,
             8,
             8
           ),
+
           petalMat
+
         );
 
 
       const angle =
-        (i / 5) *
+        (
+          i / 5
+        ) *
         Math.PI *
         2;
 
 
       petal.position.set(
-        Math.cos(angle) * 0.12,
+
+        Math.cos(angle) *
+          0.12,
+
         0.42,
-        Math.sin(angle) * 0.12
+
+        Math.sin(angle) *
+          0.12
+
       );
 
 
-      group.add(petal);
+      group.add(
+        petal
+      );
 
     }
 
 
     const center =
       new THREE.Mesh(
+
         new THREE.SphereGeometry(
           0.07,
           8,
           8
         ),
+
         mat(
           0xffc259,
           0.5
         )
+
       );
 
 
@@ -1966,7 +2426,9 @@ async function initHeroScene() {
       0.42;
 
 
-    group.add(center);
+    group.add(
+      center
+    );
 
 
     return group;
@@ -1975,10 +2437,15 @@ async function initHeroScene() {
 
 
   const flowerColors = [
+
     0xff6f81,
+
     0xffc259,
+
     0xd9bff5,
+
     0xffffff
+
   ];
 
 
@@ -1996,7 +2463,8 @@ async function initHeroScene() {
 
     const radius =
       3.4 +
-      Math.random() * 6.2;
+      Math.random() *
+      6.2;
 
 
     const x =
@@ -2014,7 +2482,9 @@ async function initHeroScene() {
       z > 2.5 &&
       z < 6
     ) {
+
       continue;
+
     }
 
 
@@ -2036,11 +2506,14 @@ async function initHeroScene() {
 
     flower.scale.setScalar(
       0.8 +
-      Math.random() * 0.5
+      Math.random() *
+      0.5
     );
 
 
-    world.add(flower);
+    world.add(
+      flower
+    );
 
   }
 
@@ -2077,12 +2550,15 @@ async function initHeroScene() {
 
         const puff =
           new THREE.Mesh(
+
             new THREE.SphereGeometry(
               radius,
               10,
               8
             ),
+
             matCloud
+
           );
 
 
@@ -2093,7 +2569,9 @@ async function initHeroScene() {
         );
 
 
-        group.add(puff);
+        group.add(
+          puff
+        );
 
       }
     );
@@ -2129,7 +2607,9 @@ async function initHeroScene() {
     ([x, y, z, scale]) => {
 
       const cloud =
-        makeCloud(scale);
+        makeCloud(
+          scale
+        );
 
 
       cloud.position.set(
@@ -2139,9 +2619,14 @@ async function initHeroScene() {
       );
 
 
-      world.add(cloud);
+      world.add(
+        cloud
+      );
 
-      clouds.push(cloud);
+
+      clouds.push(
+        cloud
+      );
 
     }
   );
@@ -2162,16 +2647,19 @@ async function initHeroScene() {
 
     const body =
       new THREE.Mesh(
+
         new THREE.SphereGeometry(
           0.4,
           16,
           16
         ),
+
         mat(
           color,
           0.35,
           0.05
         )
+
       );
 
 
@@ -2186,20 +2674,25 @@ async function initHeroScene() {
       true;
 
 
-    group.add(body);
+    group.add(
+      body
+    );
 
 
     const knot =
       new THREE.Mesh(
+
         new THREE.ConeGeometry(
           0.06,
           0.1,
           8
         ),
+
         mat(
           color,
           0.35
         )
+
       );
 
 
@@ -2207,7 +2700,9 @@ async function initHeroScene() {
       -0.5;
 
 
-    group.add(knot);
+    group.add(
+      knot
+    );
 
 
     const stringGeo =
@@ -2231,9 +2726,16 @@ async function initHeroScene() {
 
     const stringMat =
       new THREE.LineBasicMaterial({
-        color: 0x8a7a72,
-        transparent: true,
-        opacity: 0.6
+
+        color:
+          0x8a7a72,
+
+        transparent:
+          true,
+
+        opacity:
+          0.6
+
       });
 
 
@@ -2244,7 +2746,9 @@ async function initHeroScene() {
       );
 
 
-    group.add(line);
+    group.add(
+      line
+    );
 
 
     return group;
@@ -2286,14 +2790,18 @@ async function initHeroScene() {
       );
 
 
-      world.add(balloon);
+      world.add(
+        balloon
+      );
 
 
       balloons.push({
 
-        mesh: balloon,
+        mesh:
+          balloon,
 
-        baseY: y,
+        baseY:
+          y,
 
         phase:
           Math.random() *
@@ -2387,18 +2895,26 @@ async function initHeroScene() {
 
       const nx =
         (
-          (event.clientX -
-            rect.left) /
+          (
+            event.clientX -
+            rect.left
+          ) /
           rect.width
-        ) * 2 - 1;
+        ) *
+        2 -
+        1;
 
 
       const ny =
         (
-          (event.clientY -
-            rect.top) /
+          (
+            event.clientY -
+            rect.top
+          ) /
           rect.height
-        ) * 2 - 1;
+        ) *
+        2 -
+        1;
 
 
       setPointer(
@@ -2514,7 +3030,9 @@ async function initHeroScene() {
       clock.elapsedTime;
 
 
-    /* ---------- IDLE MOVEMENT ---------- */
+    /* -----------------------------------------------------
+       IDLE
+       ----------------------------------------------------- */
 
     idleAngle +=
       dt * 0.05;
@@ -2523,55 +3041,68 @@ async function initHeroScene() {
     const idleRotation =
       Math.sin(
         idleAngle
-      ) * 0.12;
+      ) *
+      0.12;
 
 
     currentRotY +=
       (
         idleRotation -
         currentRotY
-      ) * 0.015;
+      ) *
+      0.015;
 
 
     currentRotX +=
       (
         targetRotX -
         currentRotX
-      ) * 0.04;
+      ) *
+      0.04;
 
 
     world.rotation.y =
       currentRotY +
       Math.sin(
         time * 0.05
-      ) * 0.03;
+      ) *
+      0.03;
 
 
     world.rotation.x =
-      currentRotX * 0.3;
+      currentRotX *
+      0.3;
 
 
-    /* ---------- BOB ---------- */
+    /* -----------------------------------------------------
+       BOB
+       ----------------------------------------------------- */
 
     world.position.y =
       -1.4 -
-      scrollFactor * 1.6 +
+      scrollFactor *
+      1.6 +
       Math.sin(
         time * 0.6
-      ) * 0.03;
+      ) *
+      0.03;
 
 
     camera.position.y =
       3.6 +
-      scrollFactor * 0.6;
+      scrollFactor *
+      0.6;
 
 
     scene.fog.near =
       14 -
-      scrollFactor * 4;
+      scrollFactor *
+      4;
 
 
-    /* ---------- BALLOONS ---------- */
+    /* -----------------------------------------------------
+       BALLOONS
+       ----------------------------------------------------- */
 
     balloons.forEach(
       (balloon) => {
@@ -2582,7 +3113,8 @@ async function initHeroScene() {
             time *
             balloon.speed +
             balloon.phase
-          ) * 0.18;
+          ) *
+          0.18;
 
 
         balloon.mesh.rotation.z =
@@ -2591,43 +3123,56 @@ async function initHeroScene() {
             balloon.speed *
             0.5 +
             balloon.phase
-          ) * 0.05;
+          ) *
+          0.05;
 
       }
     );
 
 
-    /* ---------- CLOUDS ---------- */
+    /* -----------------------------------------------------
+       CLOUDS
+       ----------------------------------------------------- */
 
     clouds.forEach(
       (cloud, index) => {
 
         cloud.position.x +=
           Math.sin(
-            time * 0.05 +
+            time *
+            0.05 +
             index
-          ) * 0.0006;
+          ) *
+          0.0006;
 
 
         cloud.position.y +=
           Math.sin(
-            time * 0.3 +
+            time *
+            0.3 +
             index
-          ) * 0.0004;
+          ) *
+          0.0004;
 
       }
     );
 
 
-    /* ---------- SWING ---------- */
+    /* -----------------------------------------------------
+       SWING
+       ----------------------------------------------------- */
 
     seat.rotation.x =
       Math.sin(
-        time * 0.8
-      ) * 0.05;
+        time *
+        0.8
+      ) *
+      0.05;
 
 
-    /* ---------- RENDER ---------- */
+    /* -----------------------------------------------------
+       RENDER
+       ----------------------------------------------------- */
 
     renderer.render(
       scene,
@@ -2637,7 +3182,9 @@ async function initHeroScene() {
   }
 
 
-  /* ---------- START ---------- */
+  /* =======================================================
+     START
+     ======================================================= */
 
   handleResize();
 
