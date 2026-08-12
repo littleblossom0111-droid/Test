@@ -88,10 +88,25 @@ function probeImage(src) {
 function probeVideo(src) {
   return new Promise((resolve) => {
     const vid = document.createElement('video');
+
     vid.preload = 'metadata';
-    vid.onloadedmetadata = () => resolve({ ok: true, src });
-    vid.onerror = () => resolve({ ok: false });
+
+    const done = (ok) => {
+      resolve({ ok, src });
+    };
+
+    vid.onloadedmetadata = () => done(true);
+    vid.onerror = () => done(false);
+
     vid.src = src;
+    vid.load();
+
+    // Mobile/GitHub Pages fallback
+    setTimeout(() => {
+      if (vid.readyState >= 1) {
+        done(true);
+      }
+    }, 2500);
   });
 }
 
